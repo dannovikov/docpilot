@@ -36,10 +36,11 @@ app.post('/api/ask', async (req, res) => {
 
 You will receive the full text of the document organized by page number. When answering:
 1. Answer the question accurately based ONLY on the document content.
-2. Identify the exact source passage(s) you used to form your answer.
+2. Identify ALL the exact source passages you used to form your answer — aim for 2 to 6 sources when the answer draws from multiple locations.
 3. For each source, provide the exact quote from the document and the page number it appears on.
+4. The UI supports showing multiple sources simultaneously in a split view, so returning several sources is encouraged. Each source will be displayed in its own pane with the passage highlighted.
 
-IMPORTANT: The "text" field in each source must be an EXACT substring copy-pasted from the document text. Do not paraphrase or summarize the source text. It must match character-for-character so it can be found in the document.
+IMPORTANT: The "text" field in each source must be an EXACT substring copy-pasted from the document text. Do not paraphrase or summarize the source text. It must match character-for-character so it can be found in the document. Keep each source quote concise (1-3 sentences) so highlights are precise.
 
 Respond in this exact JSON format:
 {

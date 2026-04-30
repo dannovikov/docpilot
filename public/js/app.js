@@ -27,6 +27,7 @@ let renderedPages = new Set();
 let chatOpen = false;
 let isAsking = false;
 let activeHighlights = [];
+let multiSourceActive = false;
 
 // ---- DOM refs ----
 const $ = (sel) => document.querySelector(sel);
@@ -51,6 +52,10 @@ const chatSend = $('#chat-send');
 const chatClose = $('#chat-close');
 const chatIconOpen = $('#chat-icon-open');
 const chatIconClose = $('#chat-icon-close');
+const multiSourceOverlay = $('#multi-source-overlay');
+const multiSourceContent = $('#multi-source-content');
+const multiSourceCount = $('#multi-source-count');
+const multiSourceCloseBtn = $('#multi-source-close');
 
 // ============================================
 // PDF Loading & Rendering
@@ -328,8 +333,9 @@ chatForm.addEventListener('submit', async (e) => {
   chatSend.disabled = true;
   addLoadingMessage();
 
-  // Clear previous highlights
+  // Clear previous highlights and dismiss multi-source view
   clearHighlights();
+  dismissMultiSourceView();
 
   try {
     const res = await fetch('/api/ask', {
@@ -352,6 +358,12 @@ chatForm.addEventListener('submit', async (e) => {
     // Add source chips if we have sources
     if (data.sources && data.sources.length > 0) {
       answerHtml += '<br/><br/>';
+
+      // Add "View all N sources" chip when 2+ sources
+      if (data.sources.length >= 2) {
+        answerHtml += `<span class="source-chip-multi" onclick="window.__showMultiSource()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> View all ${data.sources.length} sources</span>`;
+      }
+
       data.sources.forEach((src, i) => {
         answerHtml += `<span class="source-chip" data-source-idx="${i}" onclick="window.__goToSource(${i})">📄 Page ${src.page}</span>`;
       });
@@ -362,8 +374,11 @@ chatForm.addEventListener('submit', async (e) => {
       // Highlight sources in the document
       highlightSources(data.sources);
 
-      // Scroll to the first source
-      if (data.sources[0] && data.sources[0].page) {
+      // Auto-trigger multi-source view for 2+ sources
+      if (data.sources.length >= 2) {
+        // Small delay so the message renders first
+        setTimeout(() => showMultiSourceView(data.sources), 300);
+      } else if (data.sources[0] && data.sources[0].page) {
         scrollToPage(data.sources[0].page);
       }
     }
@@ -461,6 +476,224 @@ function highlightSources(sources) {
       });
     }
   });
+}
+
+// ============================================
+// Multi-Source Split View
+// ============================================
+
+window.__showMultiSource = function() {
+  const sources = window.__currentSources;
+  if (sources && sources.length >= 2) {
+    showMultiSourceView(sources);
+  }
+};
+
+multiSourceCloseBtn.addEventListener('click', () => {
+  dismissMultiSourceView();
+});
+
+function dismissMultiSourceView() {
+  if (!multiSourceActive) return;
+  multiSourceActive = false;
+  multiSourceOverlay.classList.add('hidden');
+  multiSourceContent.innerHTML = '';
+  multiSourceContent.className = 'multi-source-content';
+}
+
+async function showMultiSourceView(sources) {
+  if (!pdfDoc || sources.length < 2) return;
+
+  multiSourceActive = true;
+  multiSourceContent.innerHTML = '';
+
+  // Pick layout class
+  const count = sources.length;
+  multiSourceCount.textContent = `${count} source locations`;
+
+  multiSourceContent.className = 'multi-source-content';
+  if (count <= 4) {
+    multiSourceContent.classList.add(`grid-${count}`);
+  } else {
+    multiSourceContent.classList.add('strip-layout');
+  }
+
+  multiSourceOverlay.classList.remove('hidden');
+
+  // Create panes
+  for (let i = 0; i < sources.length; i++) {
+    const src = sources[i];
+    const pane = await createSourcePane(src, i);
+    multiSourceContent.appendChild(pane);
+  }
+}
+
+async function createSourcePane(src, idx) {
+  const pane = document.createElement('div');
+  pane.className = 'multi-source-pane';
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'multi-source-pane-header';
+
+  const label = document.createElement('span');
+  label.className = 'multi-source-pane-label';
+  label.textContent = `📄 Page ${src.page}`;
+
+  const badge = document.createElement('span');
+  badge.className = 'multi-source-pane-badge';
+  badge.textContent = `Source ${idx + 1}`;
+
+  header.appendChild(label);
+  header.appendChild(badge);
+  pane.appendChild(header);
+
+  // Canvas area with rendered page
+  const canvasArea = document.createElement('div');
+  canvasArea.className = 'multi-source-pane-canvas';
+
+  try {
+    const page = await pdfDoc.getPage(src.page);
+    // Calculate scale to fit the pane width (assume ~300px)
+    const baseViewport = page.getViewport({ scale: 1 });
+    const paneScale = 1.2; // reasonable quality
+    const viewport = page.getViewport({ scale: paneScale });
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = viewport.width * dpr;
+    canvas.height = viewport.height * dpr;
+    canvas.style.width = viewport.width + 'px';
+    canvas.style.height = viewport.height + 'px';
+    ctx.scale(dpr, dpr);
+
+    canvasArea.appendChild(canvas);
+    canvasArea.style.width = viewport.width + 'px';
+    canvasArea.style.height = viewport.height + 'px';
+
+    // Add text layer for highlighting
+    const textLayerDiv = document.createElement('div');
+    textLayerDiv.className = 'text-layer';
+    canvasArea.appendChild(textLayerDiv);
+
+    // Render asynchronously
+    page.render({ canvasContext: ctx, viewport }).promise.then(async () => {
+      // Render text layer and highlight
+      const textContent = await page.getTextContent();
+      renderTextLayerForPane(textContent, textLayerDiv, viewport, paneScale);
+
+      // Highlight the source text in this pane's text layer
+      if (src.text) {
+        highlightInTextLayer(textLayerDiv, src.text);
+        scrollPaneToHighlight(canvasArea);
+      }
+    });
+  } catch (e) {
+    canvasArea.innerHTML = '<p style="padding: 1rem; color: var(--gray-400); font-size: 0.8rem;">Could not render page</p>';
+  }
+
+  pane.appendChild(canvasArea);
+
+  // Snippet at bottom
+  if (src.text) {
+    const snippet = document.createElement('div');
+    snippet.className = 'multi-source-pane-snippet';
+    const p = document.createElement('p');
+    p.textContent = `"${src.text}"`;
+    snippet.appendChild(p);
+    pane.appendChild(snippet);
+  }
+
+  // Click to jump to source in main viewer
+  pane.addEventListener('click', () => {
+    dismissMultiSourceView();
+    clearHighlights();
+    highlightSources([src]);
+    scrollToPage(src.page);
+  });
+
+  return pane;
+}
+
+function renderTextLayerForPane(textContent, textLayerDiv, viewport, scale) {
+  textContent.items.forEach((item) => {
+    if (!item.str) return;
+
+    const tx = pdfjsLib?.Util?.transform?.(viewport.transform, item.transform)
+      || transformItem(viewport, item);
+
+    const span = document.createElement('span');
+    span.textContent = item.str;
+    span.dataset.text = item.str;
+    span.style.left = tx[4] + 'px';
+    span.style.top = (tx[5] - item.height * scale) + 'px';
+    span.style.fontSize = (item.height * scale) + 'px';
+
+    const textWidth = item.width * scale;
+    if (item.str.length > 0 && textWidth > 0) {
+      span.style.width = textWidth + 'px';
+      const measuredWidth = measureTextWidth(item.str, item.height * scale);
+      if (measuredWidth > 0) {
+        span.style.transform = `scaleX(${textWidth / measuredWidth})`;
+      }
+    }
+
+    textLayerDiv.appendChild(span);
+  });
+}
+
+function highlightInTextLayer(textLayerDiv, sourceText) {
+  const spans = textLayerDiv.querySelectorAll('span');
+  const sourceNorm = normalizeText(sourceText);
+
+  const spanTexts = Array.from(spans).map(s => s.dataset.text || s.textContent);
+  const runningText = spanTexts.map(normalizeText).join(' ');
+  const matchStart = runningText.indexOf(sourceNorm);
+
+  if (matchStart !== -1) {
+    let charPos = 0;
+    for (let i = 0; i < spans.length; i++) {
+      const spanNorm = normalizeText(spanTexts[i]);
+      const spanEnd = charPos + spanNorm.length;
+      if (spanEnd > matchStart && charPos < matchStart + sourceNorm.length) {
+        spans[i].classList.add('highlight');
+      }
+      charPos = spanEnd + 1;
+    }
+    return;
+  }
+
+  // Fallback: word matching
+  const sourceWords = sourceNorm.split(/\s+/).filter(w => w.length > 3);
+  if (sourceWords.length === 0) return;
+  const wordSet = new Set(sourceWords);
+  let matchedCount = 0;
+  const candidates = [];
+  spans.forEach((span) => {
+    const words = normalizeText(span.dataset.text || span.textContent).split(/\s+/);
+    if (words.some(w => wordSet.has(w))) {
+      candidates.push(span);
+      matchedCount++;
+    }
+  });
+  if (matchedCount >= Math.min(3, sourceWords.length * 0.3)) {
+    candidates.forEach(span => span.classList.add('highlight'));
+  }
+}
+
+function scrollPaneToHighlight(canvasArea) {
+  // Find first highlighted span and scroll it into view within the pane
+  const highlighted = canvasArea.querySelector('.highlight');
+  if (highlighted) {
+    const paneRect = canvasArea.getBoundingClientRect();
+    const highlightRect = highlighted.getBoundingClientRect();
+    // Calculate offset relative to the canvas area's scroll
+    const offsetTop = highlighted.offsetTop - canvasArea.offsetTop;
+    // Scroll so highlight is centered in the pane
+    const scrollTarget = offsetTop - canvasArea.clientHeight / 3;
+    canvasArea.scrollTop = Math.max(0, scrollTarget);
+  }
 }
 
 function normalizeText(text) {

@@ -125,6 +125,19 @@
       </div>
     </header>
     <div id="pdf-viewer" class="pdf-viewer"></div>
+    <!-- Multi-source overlay -->
+    <div id="multi-source-overlay" class="multi-source-overlay hidden">
+      <div class="multi-source-header">
+        <span id="multi-source-count" class="multi-source-count"></span>
+        <button id="multi-source-close" class="multi-source-close-btn" title="Close multi-source view">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+          Back to document
+        </button>
+      </div>
+      <div id="multi-source-content" class="multi-source-content"></div>
+    </div>
   </div>
 
   <!-- Chat FAB -->
