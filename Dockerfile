@@ -1,5 +1,12 @@
-FROM nginx:alpine
-COPY . /usr/share/nginx/html
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package.json ./
+RUN npm install --production
+
+COPY . .
+
 EXPOSE 8080
-RUN sed -i 's/listen\s*80;/listen 8080;/g' /etc/nginx/conf.d/default.conf
-CMD ["nginx", "-g", "daemon off;"]
+
+CMD ["node", "server.js"]
