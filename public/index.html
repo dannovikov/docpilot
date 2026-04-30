@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>docpilot — Document Copilot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Drop overlay shown when dragging files over the window -->
+  <div id="drop-overlay" class="drop-overlay hidden">
+    <div class="drop-overlay-content">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p>Drop your PDF here</p>
+    </div>
+  </div>
+
+  <!-- Empty state / landing -->
+  <div id="empty-state" class="empty-state">
+    <div class="empty-content">
+      <div class="logo">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+      </div>
+      <h1>docpilot</h1>
+      <p class="tagline">Your AI document copilot</p>
+      <div class="upload-zone" id="upload-zone">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p><strong>Drag & drop a PDF here</strong></p>
+        <p class="subtle">or click to browse</p>
+        <input type="file" id="file-input" accept="application/pdf" hidden>
+      </div>
+    </div>
+  </div>
+
+  <!-- Document viewer -->
+  <div id="viewer-container" class="viewer-container hidden">
+    <header class="viewer-header">
+      <div class="header-left">
+        <svg class="header-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        <span id="doc-title" class="doc-title">Document</span>
+      </div>
+      <div class="header-center">
+        <button id="prev-page" class="nav-btn" title="Previous page">‹</button>
+        <span id="page-indicator" class="page-indicator">Page 1 / 1</span>
+        <button id="next-page" class="nav-btn" title="Next page">›</button>
+      </div>
+      <div class="header-right">
+        <button id="new-doc-btn" class="btn-secondary" title="Load new document">New PDF</button>
+        <input type="file" id="new-file-input" accept="application/pdf" hidden>
+      </div>
+    </header>
+    <div id="pdf-viewer" class="pdf-viewer"></div>
+  </div>
+
+  <!-- Chat FAB -->
+  <button id="chat-fab" class="chat-fab" title="Ask about this document">
+    <svg id="chat-icon-open" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+    </svg>
+    <svg id="chat-icon-close" class="hidden" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  </button>
+
+  <!-- Chat panel -->
+  <div id="chat-panel" class="chat-panel hidden">
+    <div class="chat-header">
+      <span>docpilot assistant</span>
+      <button id="chat-close" class="chat-close-btn">✕</button>
+    </div>
+    <div id="chat-messages" class="chat-messages">
+      <div class="chat-message assistant">
+        <div class="message-content">
+          Hi! I'm your document copilot. Upload a PDF and ask me anything about it — I'll answer and show you exactly where I found the information.
+        </div>
+      </div>
+    </div>
+    <form id="chat-form" class="chat-input-area">
+      <input type="text" id="chat-input" placeholder="Ask about your document..." autocomplete="off">
+      <button type="submit" id="chat-send" class="chat-send-btn" title="Send">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </form>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
+  <script src="/js/app.js" type="module"></script>
+</body>
+</html>
