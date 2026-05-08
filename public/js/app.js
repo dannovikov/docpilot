@@ -348,7 +348,17 @@ chatForm.addEventListener('submit', async (e) => {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      addMessage('assistant', `Sorry, something went wrong: ${escapeHtml(err.error || 'Unknown error')}. Please try again.`);
+      const errMsg = err.error || 'Unknown error';
+      const code = err.code || '';
+
+      if (code === 'auth_error' || code === 'quota_exceeded') {
+        // Non-retryable: don't tell the user to try again
+        addMessage('assistant', `⚠️ ${escapeHtml(errMsg)}`);
+      } else if (code === 'rate_limit') {
+        addMessage('assistant', `⏳ ${escapeHtml(errMsg)}`);
+      } else {
+        addMessage('assistant', `Sorry, something went wrong: ${escapeHtml(errMsg)}. Please try again.`);
+      }
       return;
     }
 

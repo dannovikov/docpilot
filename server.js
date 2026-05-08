@@ -81,8 +81,28 @@ Always respond with valid JSON only, no markdown formatting.`;
     res.json(parsed);
   } catch (err) {
     console.error('API error:', err.message);
-    res.status(500).json({ error: 'Failed to get AI response. Please try again.' });
+
+    const status = err?.status || err?.response?.status;
+
+    if (status === 401) {
+      return res.status(502).json({ error: 'AI service is not properly configured. Please contact the maintainer.', code: 'auth_error' });
+    }
+    if (status === 429) {
+      return res.status(429).json({ error: 'Too many requests. Please wait a moment and try again.', code: 'rate_limit' });
+    }
+    if (status === 402 || (err.message && /quota|billing|insufficient_funds/i.test(err.message))) {
+      return res.status(502).json({ error: 'AI service quota exceeded.', code: 'quota_exceeded' });
+    }
+
+    res.status(500).json({ error: 'Failed to get AI response. Please try again.', code: 'unknown' });
   }
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    openai: !!process.env.OPENAI_API_KEY,
+  });
 });
 
 app.get('*', (req, res) => {
